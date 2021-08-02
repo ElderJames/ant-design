@@ -26,40 +26,31 @@ const type = 'DragableUploadList';
 const DragableUploadListItem = ({ originNode, moveRow, file, fileList }) => {
   const ref = React.useRef();
   const index = fileList.indexOf(file);
-  const [{ isOver, dropClassName }, drop] = useDrop(
-    () => ({
-      accept: type,
-      collect: monitor => {
-        const { index: dragIndex } = monitor.getItem() || {};
-        if (dragIndex === index) {
-          return {};
-        }
-        return {
-          isOver: monitor.isOver(),
-          dropClassName: dragIndex < index ? ' drop-over-downward' : ' drop-over-upward',
-        };
-      },
-      drop: item => {
-        moveRow(item.index, index);
-      },
+  const [{ isOver, dropClassName }, drop] = useDrop({
+    accept: type,
+    collect: monitor => {
+      const { index: dragIndex } = monitor.getItem() || {};
+      if (dragIndex === index) {
+        return {};
+      }
+      return {
+        isOver: monitor.isOver(),
+        dropClassName: dragIndex < index ? ' drop-over-downward' : ' drop-over-upward',
+      };
+    },
+    drop: item => {
+      moveRow(item.index, index);
+    },
+  });
+  const [, drag] = useDrag({
+    type,
+    item: { index },
+    collect: monitor => ({
+      isDragging: monitor.isDragging(),
     }),
-    [index],
-  );
-  const [, drag] = useDrag(
-    () => ({
-      item: { type, index },
-      collect: monitor => ({
-        isDragging: monitor.isDragging(),
-      }),
-    }),
-    [],
-  );
+  });
   drop(drag(ref));
-  const errorNode = (
-    <Tooltip title="Upload Error" getPopupContainer={() => document.body}>
-      {originNode.props.children}
-    </Tooltip>
-  );
+  const errorNode = <Tooltip title="Upload Error">{originNode.props.children}</Tooltip>;
   return (
     <div
       ref={ref}
@@ -155,7 +146,6 @@ ReactDOM.render(<DragSortingUpload />, mountNode);
 #components-upload-demo-drag-sorting .ant-upload-draggable-list-item.drop-over-downward {
   border-bottom-color: #1890ff;
 }
-
 #components-upload-demo-drag-sorting .ant-upload-draggable-list-item.drop-over-upward {
   border-top-color: #1890ff;
 }

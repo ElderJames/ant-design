@@ -66,10 +66,20 @@ Please find below some of the design resources and tools about Ant Design that w
   - https://cdn.modao.cc/logo_mockingbot.svg
   - Rich component resources
   - https://modao.cc/square/ant-design
+- JiShi Design
+  - https://gw.alipayobjects.com/mdn/rms_08e378/afts/img/A*dxzdQYWlmjMAAAAAAAAAAAAAARQnAQ
+  - Use fully components and templates on JiShi Design
+  - https://js.design/antd
 
 ## Articles
 
 Do you want to know the story behind the Ant Design design system? How can I better apply Ant Design? You can check out our well selected articles below. Also welcome to follow [Ant Design Official Column](https://www.zhihu.com/column/c_1310524851418480640). There are often the latest sharing and discussions on related topics under the Ant Design design system, such as Ant Design, AntV visualization, Kitchen design Plug-ins, B-side product design, SaaS product design, natural interaction, growth design, intelligent design, design engineering, etc.
+
+```__react
+import Articles from '../site/theme/template/Resources/Articles';
+
+ReactDOM.render(<Articles />, mountNode);
+```
 
 ## Reference
 

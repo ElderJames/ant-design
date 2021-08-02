@@ -128,10 +128,10 @@ function FormItem<Values = any>(props: FormItemProps<Values>): React.ReactElemen
   // Collect noStyle Field error to the top FormItem
   const updateChildItemErrors = noStyle
     ? updateItemErrors
-    : (subName: string, subErrors: string[], originSubName: string) => {
+    : (subName: string, subErrors: string[], originSubName?: string) => {
         setInlineErrors((prevInlineErrors = {}) => {
           // Clean up origin error when name changed
-          if (originSubName !== subName) {
+          if (originSubName && originSubName !== subName) {
             delete prevInlineErrors[originSubName];
           }
 
@@ -188,7 +188,7 @@ function FormItem<Values = any>(props: FormItemProps<Values>): React.ReactElemen
 
     const itemClassName = {
       [`${prefixCls}-item`]: true,
-      [`${prefixCls}-item-with-help`]: domErrorVisible || help,
+      [`${prefixCls}-item-with-help`]: domErrorVisible || !!help,
       [`${className}`]: !!className,
 
       // Status
@@ -265,6 +265,8 @@ function FormItem<Values = any>(props: FormItemProps<Values>): React.ReactElemen
   let variables: Record<string, string> = {};
   if (typeof label === 'string') {
     variables.label = label;
+  } else if (name) {
+    variables.label = String(name);
   }
   if (messageVariables) {
     variables = { ...variables, ...messageVariables };

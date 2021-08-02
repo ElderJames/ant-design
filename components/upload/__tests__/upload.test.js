@@ -1,11 +1,12 @@
 /* eslint-disable react/no-string-refs, react/prefer-es6-class */
 import React from 'react';
-import { mount } from 'enzyme';
+import { mount, render } from 'enzyme';
 import { act } from 'react-dom/test-utils';
 import produce from 'immer';
+import { cloneDeep } from 'lodash';
 import Upload from '..';
 import Form from '../../form';
-import { T, wrapFile, getFileItem, removeFileItem } from '../utils';
+import { getFileItem, removeFileItem, isImageUrl } from '../utils';
 import { setup, teardown } from './mock';
 import { resetWarned } from '../../_util/devWarning';
 import mountTest from '../../../tests/shared/mountTest';
@@ -284,37 +285,21 @@ describe('Upload', () => {
     jest.useRealTimers();
   });
 
+  it('should be able to get uid at first', () => {
+    const fileList = [
+      {
+        name: 'foo.png',
+        status: 'done',
+        url: 'http://www.baidu.com/xxx.png',
+      },
+    ];
+    render(<Upload fileList={fileList} />);
+    fileList.forEach(file => {
+      expect(file.uid).toBeDefined();
+    });
+  });
+
   describe('util', () => {
-    // https://github.com/react-component/upload/issues/36
-    it('should T() return true', () => {
-      const res = T();
-      expect(res).toBe(true);
-    });
-
-    describe('wrapFile', () => {
-      it('should be able to copy file instance when Proxy not support', () => {
-        const file = new File([], 'aaa.zip');
-
-        const OriginProxy = global.Proxy;
-        global.Proxy = undefined;
-
-        const copiedFile = wrapFile(file);
-        ['uid', 'lastModified', 'lastModifiedDate', 'name', 'size', 'type'].forEach(key => {
-          expect(key in copiedFile).toBe(true);
-        });
-
-        global.Proxy = OriginProxy;
-      });
-
-      it('Proxy support', () => {
-        const file = new File([], 'aaa.zip');
-        const copiedFile = wrapFile(file);
-        ['uid', 'lastModified', 'lastModifiedDate', 'name', 'size', 'type'].forEach(key => {
-          expect(key in copiedFile).toBe(true);
-        });
-      });
-    });
-
     it('should be able to get fileItem', () => {
       const file = { uid: '-1', name: 'item.jpg' };
       const fileList = [
@@ -343,7 +328,7 @@ describe('Upload', () => {
       expect(targetItem).toEqual(fileList.slice(1));
     });
 
-    it('remove fileItem and fileList with immuable data', () => {
+    it('remove fileItem and fileList with immutable data', () => {
       const file = { uid: '-3', name: 'item3.jpg' };
       const fileList = produce(
         [
@@ -381,6 +366,13 @@ describe('Upload', () => {
       ];
       const targetItem = removeFileItem(file, fileList);
       expect(targetItem).toBe(null);
+    });
+
+    it('isImageUrl should work correctly when file.url is null', () => {
+      const file = {
+        url: null,
+      };
+      expect(isImageUrl(file)).toBe(true);
     });
   });
 
@@ -441,7 +433,7 @@ describe('Upload', () => {
 
     wrapper.find('div.ant-upload-list-item .anticon-delete').simulate('click');
 
-    setImmediate(() => {
+    setTimeout(() => {
       wrapper.update();
 
       expect(mockRemove).toHaveBeenCalled();
@@ -456,17 +448,16 @@ describe('Upload', () => {
     let wrapper;
 
     const props = {
-      onRemove: () =>
-        new Promise(
-          resolve =>
-            setTimeout(() => {
-              wrapper.update();
-              expect(props.fileList).toHaveLength(1);
-              expect(props.fileList[0].status).toBe('uploading');
-              resolve(true);
-            }),
-          100,
-        ),
+      onRemove: async () => {
+        await act(async () => {
+          await sleep(100);
+          wrapper.update();
+          expect(props.fileList).toHaveLength(1);
+          expect(props.fileList[0].status).toBe('uploading');
+        });
+
+        return true;
+      },
       fileList: [
         {
           uid: '-1',
@@ -508,7 +499,7 @@ describe('Upload', () => {
 
     wrapper.find('div.ant-upload-list-item .anticon-download').simulate('click');
 
-    setImmediate(() => {
+    setTimeout(() => {
       wrapper.update();
 
       expect(props.fileList).toHaveLength(1);
@@ -554,20 +545,35 @@ describe('Upload', () => {
   it('should replace file when targetItem already exists', () => {
     const fileList = [{ uid: 'file', name: 'file' }];
     const ref = React.createRef();
-    mount(
+    const wrapper = mount(
       <Upload ref={ref} defaultFileList={fileList}>
         <button type="button">upload</button>
       </Upload>,
     );
-    ref.current.onStart({
+
+    const newFile = {
       uid: 'file',
       name: 'file1',
+    };
+
+    act(() => {
+      ref.current.onBatchStart([
+        {
+          file: newFile,
+          parsedFile: newFile,
+        },
+      ]);
     });
+
+    wrapper.update();
+
     expect(ref.current.fileList.length).toBe(1);
     expect(ref.current.fileList[0].originFileObj).toEqual({
       name: 'file1',
       uid: 'file',
     });
+
+    wrapper.unmount();
   });
 
   it('warning if set `value`', () => {
@@ -633,20 +639,15 @@ describe('Upload', () => {
 
         switch (callTimes) {
           case 1:
-            expect(e.file.originFileObj).toBeTruthy();
-            expect(file.status).toBe(undefined);
-            break;
-
           case 2:
-          case 3:
             expect(file).toEqual(expect.objectContaining({ status: 'uploading', percent: 0 }));
             break;
 
-          case 4:
+          case 3:
             expect(file).toEqual(expect.objectContaining({ status: 'uploading', percent: 100 }));
             break;
 
-          case 5:
+          case 4:
             expect(file).toEqual(expect.objectContaining({ status: 'done', percent: 100 }));
             break;
 
@@ -785,5 +786,82 @@ describe('Upload', () => {
     );
 
     expect(fileList[0].uid).toBeTruthy();
+  });
+
+  it('Proxy should support deepClone', async () => {
+    const onChange = jest.fn();
+
+    const wrapper = mount(
+      <Upload onChange={onChange}>
+        <button type="button">upload</button>
+      </Upload>,
+    );
+
+    wrapper.find('input').simulate('change', {
+      target: {
+        files: [
+          new File(['foo'], 'foo.png', {
+            type: 'image/png',
+          }),
+        ],
+      },
+    });
+
+    await sleep();
+
+    const { file } = onChange.mock.calls[0][0];
+    const clone = cloneDeep(file);
+
+    expect(Object.getOwnPropertyDescriptor(file, 'name')).toEqual(
+      expect.objectContaining({ value: 'foo.png' }),
+    );
+
+    ['uid', 'name', 'lastModified', 'lastModifiedDate', 'size', 'type'].forEach(key => {
+      expect(key in clone).toBeTruthy();
+    });
+  });
+
+  it('not break on freeze object', async () => {
+    const fileList = [
+      {
+        fileName: 'Test.png',
+        name: 'SupportIS App - potwierdzenie.png',
+        thumbUrl: null,
+        downloadUrl: 'https://localhost:5001/api/files/ff2917ce-e4b9-4542-84da-31cdbe7c273f',
+        status: 'done',
+      },
+    ];
+
+    const frozenFileList = fileList.map(file => Object.freeze(file));
+
+    const wrapper = mount(<Upload fileList={frozenFileList} />);
+    const rmBtn = wrapper.find('.ant-upload-list-item-card-actions-btn').last();
+    rmBtn.simulate('click');
+
+    // Wait for Upload async remove
+    await act(async () => {
+      await sleep();
+    });
+  });
+
+  // https://github.com/ant-design/ant-design/issues/30390
+  // IE11 Does not support the File constructor
+  it('should not break in IE if beforeUpload returns false', async () => {
+    const onChange = jest.fn();
+    const wrapper = mount(<Upload beforeUpload={() => false} fileList={[]} onChange={onChange} />);
+    const fileConstructor = () => {
+      throw new TypeError("Object doesn't support this action");
+    };
+    global.File = jest.fn().mockImplementationOnce(fileConstructor);
+
+    await act(async () =>
+      wrapper.find('input').simulate('change', {
+        target: {
+          files: [{ file: 'foo.png' }],
+        },
+      }),
+    );
+
+    expect(onChange.mock.calls[0][0].fileList).toHaveLength(1);
   });
 });

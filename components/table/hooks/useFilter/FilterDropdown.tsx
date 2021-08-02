@@ -8,14 +8,7 @@ import Checkbox from '../../../checkbox';
 import Radio from '../../../radio';
 import Dropdown from '../../../dropdown';
 import Empty from '../../../empty';
-import {
-  ColumnType,
-  ColumnFilterItem,
-  Key,
-  TableLocale,
-  GetPopupContainer,
-  FilterConfirmProps,
-} from '../../interface';
+import { ColumnType, ColumnFilterItem, Key, TableLocale, GetPopupContainer } from '../../interface';
 import FilterDropdownMenuWrapper from './FilterWrapper';
 import { FilterState } from '.';
 import useSyncState from '../../../_util/hooks/useSyncState';
@@ -44,19 +37,21 @@ function renderFilterItems({
     // wrapped with <div /> to avoid react warning
     // https://github.com/ant-design/ant-design/issues/25979
     return (
-      <div
-        style={{
-          margin: '16px 0',
-        }}
-      >
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description={locale.filterEmptyText}
-          imageStyle={{
-            height: 24,
+      <MenuItem key="empty">
+        <div
+          style={{
+            margin: '16px 0',
           }}
-        />
-      </div>
+        >
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description={locale.filterEmptyText}
+            imageStyle={{
+              height: 24,
+            }}
+          />
+        </div>
+      </MenuItem>
     );
   }
   return filters.map((filter, index) => {
@@ -92,6 +87,7 @@ function renderFilterItems({
 }
 
 export interface FilterDropdownProps<RecordType> {
+  tablePrefixCls: string;
   prefixCls: string;
   dropdownPrefixCls: string;
   column: ColumnType<RecordType>;
@@ -106,6 +102,7 @@ export interface FilterDropdownProps<RecordType> {
 
 function FilterDropdown<RecordType>(props: FilterDropdownProps<RecordType>) {
   const {
+    tablePrefixCls,
     prefixCls,
     column,
     dropdownPrefixCls,
@@ -192,8 +189,10 @@ function FilterDropdown<RecordType>(props: FilterDropdownProps<RecordType>) {
     internalTriggerFilter([]);
   };
 
-  const doFilter = (param: FilterConfirmProps = { closeDropdown: true }) => {
-    triggerVisible(!param.closeDropdown);
+  const doFilter = ({ closeDropdown } = { closeDropdown: true }) => {
+    if (closeDropdown) {
+      triggerVisible(false);
+    }
     internalTriggerFilter(getFilteredKeysSync());
   };
 
@@ -284,36 +283,29 @@ function FilterDropdown<RecordType>(props: FilterDropdownProps<RecordType>) {
   const { direction } = React.useContext(ConfigContext);
 
   return (
-    <div className={classNames(`${prefixCls}-column`)}>
-      <span className={`${prefixCls}-column-title`}>{children}</span>
-
-      <span
-        className={classNames(`${prefixCls}-trigger-container`, {
-          [`${prefixCls}-trigger-container-open`]: mergedVisible,
-        })}
-        onClick={e => {
-          e.stopPropagation();
-        }}
+    <div className={`${prefixCls}-column`}>
+      <span className={`${tablePrefixCls}-column-title`}>{children}</span>
+      <Dropdown
+        overlay={menu}
+        trigger={['click']}
+        visible={mergedVisible}
+        onVisibleChange={onVisibleChange}
+        getPopupContainer={getPopupContainer}
+        placement={direction === 'rtl' ? 'bottomLeft' : 'bottomRight'}
       >
-        <Dropdown
-          overlay={menu}
-          trigger={['click']}
-          visible={mergedVisible}
-          onVisibleChange={onVisibleChange}
-          getPopupContainer={getPopupContainer}
-          placement={direction === 'rtl' ? 'bottomLeft' : 'bottomRight'}
+        <span
+          role="button"
+          tabIndex={-1}
+          className={classNames(`${prefixCls}-trigger`, {
+            active: filtered,
+          })}
+          onClick={e => {
+            e.stopPropagation();
+          }}
         >
-          <span
-            role="button"
-            tabIndex={-1}
-            className={classNames(`${prefixCls}-trigger`, {
-              active: filtered,
-            })}
-          >
-            {filterIcon}
-          </span>
-        </Dropdown>
-      </span>
+          {filterIcon}
+        </span>
+      </Dropdown>
     </div>
   );
 }

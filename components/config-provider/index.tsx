@@ -149,7 +149,7 @@ const ProviderChildren: React.FC<ProviderChildrenProps> = props => {
 
       return suffixCls ? `${mergedPrefixCls}-${suffixCls}` : mergedPrefixCls;
     },
-    [parentContext.getPrefixCls],
+    [parentContext.getPrefixCls, props.prefixCls],
   );
 
   const config = {
@@ -187,7 +187,9 @@ const ProviderChildren: React.FC<ProviderChildrenProps> = props => {
     },
   );
 
-  const memoIconContextValue = React.useMemo(() => ({ prefixCls: iconPrefixCls }), [iconPrefixCls]);
+  const memoIconContextValue = React.useMemo(() => ({ prefixCls: iconPrefixCls, csp }), [
+    iconPrefixCls,
+  ]);
 
   let childNode = children;
   // Additional Form provider

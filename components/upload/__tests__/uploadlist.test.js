@@ -201,8 +201,10 @@ describe('Upload List', () => {
     });
 
     // Wait twice since `errorRequest` also use timeout for mock
-    await sleep();
-    await sleep();
+    await act(async () => {
+      await sleep();
+      await sleep();
+    });
 
     expect(onChange).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -212,7 +214,11 @@ describe('Upload List', () => {
       }),
     );
 
-    wrapper.update();
+    await act(async () => {
+      await sleep(1000);
+      wrapper.update();
+    });
+
     expect(wrapper.render()).toMatchSnapshot();
 
     // Error message
@@ -1127,22 +1133,28 @@ describe('Upload List', () => {
     const wrapper = mount(<MyUpload />);
 
     // Mock async update in a frame
-    const files = ['light', 'bamboo', 'little'];
+    const fileNames = ['light', 'bamboo', 'little'];
 
-    /* eslint-disable no-await-in-loop */
-    for (let i = 0; i < files.length; i += 1) {
-      await Promise.resolve();
-      uploadRef.current.onStart({
-        uid: files[i],
-        name: files[i],
-      });
-    }
-    /* eslint-enable */
+    act(() => {
+      uploadRef.current.onBatchStart(
+        fileNames.map(fileName => {
+          const file = new File([], fileName);
+          file.uid = fileName;
 
-    expect(uploadRef.current.fileList).toHaveLength(files.length);
+          return {
+            file,
+            parsedFile: file,
+          };
+        }),
+      );
+    });
 
-    jest.runAllTimers();
-    expect(uploadRef.current.fileList).toHaveLength(files.length);
+    expect(uploadRef.current.fileList).toHaveLength(fileNames.length);
+
+    act(() => {
+      jest.runAllTimers();
+    });
+    expect(uploadRef.current.fileList).toHaveLength(fileNames.length);
 
     wrapper.unmount();
 
@@ -1150,19 +1162,51 @@ describe('Upload List', () => {
   });
 
   it('itemRender', () => {
-    const itemRender = (originNode, file, currFileList) => {
+    const onDownload = jest.fn();
+    const onRemove = jest.fn();
+    const onPreview = jest.fn();
+    const itemRender = (originNode, file, currFileList, actions) => {
       const { name, status, uid, url } = file;
       const index = currFileList.indexOf(file);
       return (
-        <span className="custom-item-render">
-          {`uid:${uid} name: ${name} status: ${status} url: ${url}  ${index + 1}/${
-            currFileList.length
-          }`}
-        </span>
+        <div className="custom-item-render">
+          <span>
+            {`uid:${uid} name: ${name} status: ${status} url: ${url}  ${index + 1}/${
+              currFileList.length
+            }`}
+          </span>
+          <span onClick={actions.remove} className="custom-item-render-action-remove">
+            remove
+          </span>
+          <span onClick={actions.download} className="custom-item-render-action-download">
+            download
+          </span>
+          <span onClick={actions.preview} className="custom-item-render-action-preview">
+            preview
+          </span>
+        </div>
       );
     };
-    const wrapper = mount(<UploadList locale={{}} items={fileList} itemRender={itemRender} />);
+    const wrapper = mount(
+      <UploadList
+        onDownload={onDownload}
+        onPreview={onPreview}
+        onRemove={onRemove}
+        locale={{}}
+        items={fileList}
+        itemRender={itemRender}
+      />,
+    );
     expect(wrapper.render()).toMatchSnapshot();
+
+    wrapper.find('.custom-item-render-action-remove').first().simulate('click');
+    expect(onRemove.mock.calls[0][0]).toEqual(fileList[0]);
+
+    wrapper.find('.custom-item-render-action-download').first().simulate('click');
+    expect(onDownload.mock.calls[0][0]).toEqual(fileList[0]);
+
+    wrapper.find('.custom-item-render-action-preview').first().simulate('click');
+    expect(onPreview.mock.calls[0][0]).toEqual(fileList[0]);
 
     wrapper.unmount();
   });
@@ -1184,6 +1228,14 @@ describe('Upload List', () => {
     expect(beforeUpload).toHaveBeenCalled();
     expect(wrapper.find('UploadList').props().items).toHaveLength(0);
 
+    wrapper.unmount();
+  });
+
+  it('Not crash when fileList is null', () => {
+    const defaultWrapper = mount(<Upload defaultFileList={null} />);
+    defaultWrapper.unmount();
+
+    const wrapper = mount(<Upload fileList={null} />);
     wrapper.unmount();
   });
 });

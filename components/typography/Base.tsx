@@ -37,6 +37,8 @@ interface EditConfig {
   tooltip?: boolean | React.ReactNode;
   onStart?: () => void;
   onChange?: (value: string) => void;
+  onCancel?: () => void;
+  onEnd?: () => void;
   maxLength?: number;
   autoSize?: boolean | AutoSizeType;
 }
@@ -65,10 +67,11 @@ export interface BlockProps extends TypographyProps {
   delete?: boolean;
   strong?: boolean;
   keyboard?: boolean;
+  italic?: boolean;
 }
 
 function wrapperDecorations(
-  { mark, code, underline, delete: del, strong, keyboard }: BlockProps,
+  { mark, code, underline, delete: del, strong, keyboard, italic }: BlockProps,
   content: React.ReactNode,
 ) {
   let currentContent = content;
@@ -85,8 +88,16 @@ function wrapperDecorations(
   wrap(code, 'code');
   wrap(mark, 'mark');
   wrap(keyboard, 'kbd');
+  wrap(italic, 'i');
 
   return currentContent;
+}
+
+function getNode(dom: React.ReactNode, defaultNode: React.ReactNode, needDom?: boolean) {
+  if (dom === true || dom === undefined) {
+    return defaultNode;
+  }
+  return dom || (needDom && defaultNode);
 }
 
 interface InternalBlockProps extends BlockProps {
@@ -193,7 +204,8 @@ class Base extends React.Component<InternalBlockProps, BaseState> {
   };
 
   // ================ Edit ================
-  onEditClick = () => {
+  onEditClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
     this.triggerEdit(true);
   };
 
@@ -204,6 +216,7 @@ class Base extends React.Component<InternalBlockProps, BaseState> {
   };
 
   onEditCancel = () => {
+    this.getEditable().onCancel?.();
     this.triggerEdit(false);
   };
 
@@ -385,23 +398,27 @@ class Base extends React.Component<InternalBlockProps, BaseState> {
 
     const prefixCls = this.getPrefixCls();
 
-    const { tooltips } = copyable as CopyConfig;
-    let tooltipNodes = toArray(tooltips) as React.ReactNode[];
-    if (tooltipNodes.length === 0) {
-      tooltipNodes = [this.copyStr, this.copiedStr];
-    }
-    const title = copied ? tooltipNodes[1] : tooltipNodes[0];
-    const ariaLabel = typeof title === 'string' ? title : '';
-    const icons = toArray((copyable as CopyConfig).icon);
+    const { tooltips, icon } = copyable as CopyConfig;
+
+    const tooltipNodes = Array.isArray(tooltips) ? tooltips : [tooltips];
+    const iconNodes = Array.isArray(icon) ? icon : [icon];
+
+    const title = copied
+      ? getNode(tooltipNodes[1], this.copiedStr)
+      : getNode(tooltipNodes[0], this.copyStr);
+    const systemStr = copied ? this.copiedStr : this.copyStr;
+    const ariaLabel = typeof title === 'string' ? title : systemStr;
 
     return (
-      <Tooltip key="copy" title={tooltips === false ? '' : title}>
+      <Tooltip key="copy" title={title}>
         <TransButton
           className={classNames(`${prefixCls}-copy`, copied && `${prefixCls}-copy-success`)}
           onClick={this.onCopyClick}
           aria-label={ariaLabel}
         >
-          {copied ? icons[1] || <CheckOutlined /> : icons[0] || <CopyOutlined />}
+          {copied
+            ? getNode(iconNodes[1], <CheckOutlined />, true)
+            : getNode(iconNodes[0], <CopyOutlined />, true)}
         </TransButton>
       </Tooltip>
     );
@@ -410,12 +427,13 @@ class Base extends React.Component<InternalBlockProps, BaseState> {
   renderEditInput() {
     const { children, className, style } = this.props;
     const { direction } = this.context;
-    const { maxLength, autoSize } = this.getEditable();
+    const { maxLength, autoSize, onEnd } = this.getEditable();
     return (
       <Editable
         value={typeof children === 'string' ? children : ''}
         onSave={this.onEditChange}
         onCancel={this.onEditCancel}
+        onEnd={onEnd}
         prefixCls={this.getPrefixCls()}
         className={className}
         style={style}
@@ -451,6 +469,7 @@ class Base extends React.Component<InternalBlockProps, BaseState> {
       'underline',
       'strong',
       'keyboard',
+      'italic',
       ...(configConsumerProps as any),
     ]) as any;
 
@@ -469,7 +488,7 @@ class Base extends React.Component<InternalBlockProps, BaseState> {
       }
 
       // show rest content as title on symbol
-      restContent = restContent?.slice(String(ellipsisContent || '').length);
+      restContent = restContent.slice(String(ellipsisContent || '').length);
 
       // We move full content to outer element to avoid repeat read the content by accessibility
       textNode = (
@@ -510,13 +529,14 @@ class Base extends React.Component<InternalBlockProps, BaseState> {
           this.expandStr = expand;
 
           return (
-            <ResizeObserver onResize={this.resizeOnNextFrame} disabled={!rows}>
+            <ResizeObserver onResize={this.resizeOnNextFrame} disabled={cssEllipsis}>
               <Typography
                 className={classNames(
                   {
                     [`${prefixCls}-${type}`]: type,
                     [`${prefixCls}-disabled`]: disabled,
                     [`${prefixCls}-ellipsis`]: rows,
+                    [`${prefixCls}-single-line`]: rows === 1,
                     [`${prefixCls}-ellipsis-single-line`]: cssTextOverflow,
                     [`${prefixCls}-ellipsis-multiple-line`]: cssLineClamp,
                   },

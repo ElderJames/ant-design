@@ -21,7 +21,7 @@ Related issue: [#3487](https://github.com/ant-design/ant-design/issues/3487) [#3
 
 ### How do I prevent `Select Dropdown DatePicker TimePicker Popover Popconfirm` scrolling with the page?
 
-Use `<Select getPopupContainer={trigger => trigger.parentElement}>` ([API reference](https://ant.design/components/select-cn/#Select-props)) to render a component inside the scroll area. If you need to config this globally in your application, try `<ConfigProvider getPopupContainer={trigger => trigger.parentElement}>` ([API reference](https://ant.design/components/config-provider-cn/#API))
+Use `<Select getPopupContainer={trigger => trigger.parentElement}>` ([API reference](/components/select/#Select-props)) to render a component inside the scroll area. If you need to config this globally in your application, try `<ConfigProvider getPopupContainer={trigger => trigger.parentElement}>` ([API reference](/components/config-provider/#API))
 
 And make sure that parentElement is `position: relative` or `position: absolute`.
 
@@ -114,7 +114,7 @@ Or you can simply upgrade to [antd@4.0](https://github.com/ant-design/ant-design
 
 ### message/notification/Modal.confirm lost styles when set `prefixCls` on ConfigProvider?
 
-Static methods like message/notification/Modal.confirm are not using the same render tree as `<Button />`, but rendered to indepent DOM node created by `ReactDOM.render`, which cannot access React context from ConfigProvider. Consider two solutions here:
+Static methods like message/notification/Modal.confirm are not using the same render tree as `<Button />`, but rendered to independent DOM node created by `ReactDOM.render`, which cannot access React context from ConfigProvider. Consider two solutions here:
 
 1. Replace original usages with [message.useMessage](/components/message/#components-message-demo-hooks), [notification.useNotification](/components/notification/#Why-I-can-not-access-context,-redux,-ConfigProvider-locale/prefixCls-in-notification) and [Modal.useModal](/components/modal/#Why-I-can-not-access-context,-redux,-ConfigProvider-locale/prefixCls-in-Modal.xxx).
 

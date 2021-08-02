@@ -13,7 +13,6 @@
 
   display: inline-block;
   font-size: 0;
-  line-height: unset;
 
   .@{ant-prefix}-badge-count {
     z-index: 1;
@@ -27,12 +26,18 @@
 // 一般状态
 .@{radio-prefix-cls}-wrapper {
   .reset-component();
-
   position: relative;
-  display: inline-block;
+  display: inline-flex;
+  align-items: baseline;
   margin-right: @radio-wrapper-margin-right;
-  white-space: nowrap;
   cursor: pointer;
+
+  &::after {
+    display: inline-block;
+    width: 0;
+    overflow: hidden;
+    content: '\a0';
+  }
 }
 
 .@{radio-prefix-cls} {
@@ -41,9 +46,6 @@
   position: relative;
   top: @radio-top;
   display: inline-block;
-  line-height: 1;
-  white-space: nowrap;
-  vertical-align: text-bottom;
   outline: none;
   cursor: pointer;
 
@@ -81,7 +83,7 @@
       position: absolute;
       top: ((@radio-size - @radio-dot-size) / 2) - @radio-border-width;
       left: ((@radio-size - @radio-dot-size) / 2) - @radio-border-width;
-      display: table;
+      display: block;
       width: @radio-dot-size;
       height: @radio-dot-size;
       background-color: @radio-dot-color;

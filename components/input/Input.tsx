@@ -61,31 +61,47 @@ export function fixControlledValue<T>(value: T) {
   return value;
 }
 
-export function resolveOnChange(
-  target: HTMLInputElement | HTMLTextAreaElement,
+export function resolveOnChange<E extends HTMLInputElement | HTMLTextAreaElement>(
+  target: E,
   e:
-    | React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>
-    | React.MouseEvent<HTMLElement, MouseEvent>,
-  onChange?: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void,
+    | React.ChangeEvent<E>
+    | React.MouseEvent<HTMLElement, MouseEvent>
+    | React.CompositionEvent<HTMLElement>,
+  onChange:
+    | undefined
+    | ((event: React.ChangeEvent<E>) => void),
+  targetValue?: string,
 ) {
   if (!onChange) {
     return;
   }
   let event = e;
+  const originalInputValue = target.value;
+
   if (e.type === 'click') {
     // click clear icon
     event = Object.create(e);
     event.target = target;
     event.currentTarget = target;
-    const originalInputValue = target.value;
     // change target ref value cause e.target.value should be '' when clear input
     target.value = '';
-    onChange(event as React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>);
+    onChange(event as React.ChangeEvent<E>);
     // reset target ref value
     target.value = originalInputValue;
     return;
   }
-  onChange(event as React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>);
+
+  // Trigger by composition event, this means we need force change the input value
+  if (targetValue !== undefined) {
+    event = Object.create(e);
+    event.target = target;
+    event.currentTarget = target;
+
+    target.value = targetValue;
+    onChange(event as React.ChangeEvent<E>);
+    return;
+  }
+  onChange(event as React.ChangeEvent<E>);
 }
 
 export function getInputClassName(
@@ -152,9 +168,9 @@ class Input extends React.Component<InputProps, InputState> {
     type: 'text',
   };
 
-  input: HTMLInputElement;
+  input!: HTMLInputElement;
 
-  clearableInput: ClearableLabeledInput;
+  clearableInput!: ClearableLabeledInput;
 
   removePasswordTimeout: any;
 

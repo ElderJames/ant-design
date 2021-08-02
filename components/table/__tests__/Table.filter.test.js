@@ -1,6 +1,7 @@
 /* eslint-disable react/no-multi-comp */
 import React from 'react';
 import { mount } from 'enzyme';
+import { act } from 'react-dom/test-utils';
 import Table from '..';
 import Input from '../../input';
 import Tooltip from '../../tooltip';
@@ -11,11 +12,12 @@ import ConfigProvider from '../../config-provider';
 // https://github.com/Semantic-Org/Semantic-UI-React/blob/72c45080e4f20b531fda2e3e430e384083d6766b/test/specs/modules/Dropdown/Dropdown-test.js#L73
 const nativeEvent = { nativeEvent: { stopImmediatePropagation: () => {} } };
 
-function getDropdownWrapper(wrapper) {
-  return mount(wrapper.find('Trigger').instance().getComponent());
-}
-
 describe('Table.filter', () => {
+  window.requestAnimationFrame = function (callback) {
+    return window.setTimeout(callback, 16);
+  };
+  window.cancelAnimationFrame = window.clearTimeout;
+
   const filterFn = (value, record) => record.name.indexOf(value) !== -1;
   const column = {
     title: 'Name',
@@ -96,6 +98,8 @@ describe('Table.filter', () => {
   });
 
   it('renders empty menu correctly', () => {
+    jest.useFakeTimers();
+
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
     const wrapper = mount(
       createTable({
@@ -108,11 +112,18 @@ describe('Table.filter', () => {
       }),
     );
     wrapper.find('span.ant-dropdown-trigger').simulate('click', nativeEvent);
-    expect(wrapper.find('Empty').length).toBe(1);
+    act(() => {
+      jest.runAllTimers();
+      wrapper.update();
+    });
+
+    expect(wrapper.find('Empty').length).toBeTruthy();
     // eslint-disable-next-line no-console
     expect(console.error).not.toHaveBeenCalled();
     // eslint-disable-next-line no-console
     console.error.mockRestore();
+
+    jest.useRealTimers();
   });
 
   it('renders radio filter correctly', () => {
@@ -543,24 +554,49 @@ describe('Table.filter', () => {
     );
     jest.useFakeTimers();
 
-    let dropdownWrapper = getDropdownWrapper(wrapper);
     expect(renderedNames(wrapper)).toEqual(['Jack', 'Lucy', 'Tom', 'Jerry']);
-    // select
-    dropdownWrapper.find('.ant-dropdown-menu-submenu-title').at(0).simulate('mouseEnter');
-    jest.runAllTimers();
-    dropdownWrapper = getDropdownWrapper(wrapper);
-    dropdownWrapper.find('.ant-dropdown-menu-submenu-title').at(1).simulate('mouseEnter');
-    jest.runAllTimers();
-    dropdownWrapper = getDropdownWrapper(wrapper);
-    dropdownWrapper.find('MenuItem').last().simulate('click');
-    dropdownWrapper.find('.ant-table-filter-dropdown-btns .ant-btn-primary').simulate('click');
+
+    // Open
+    wrapper.find('.ant-table-filter-trigger').simulate('click');
+
+    function getFilterMenu() {
+      return wrapper.find('FilterDropdown');
+    }
+
+    // Seems raf not trigger when in useEffect for async update
+    // Need trigger multiple times
+    function refreshTimer() {
+      for (let i = 0; i < 3; i += 1) {
+        act(() => {
+          jest.runAllTimers();
+          wrapper.update();
+        });
+      }
+    }
+
+    // Open Level2
+    getFilterMenu().find('div.ant-dropdown-menu-submenu-title').at(0).simulate('mouseEnter');
+    refreshTimer();
+
+    // Open Level3
+    getFilterMenu().find('div.ant-dropdown-menu-submenu-title').at(1).simulate('mouseEnter');
+    refreshTimer();
+
+    // Select Level3 value
+    getFilterMenu().find('li.ant-dropdown-menu-item').last().simulate('click');
+    getFilterMenu().find('.ant-table-filter-dropdown-btns .ant-btn-primary').simulate('click');
+    refreshTimer();
+
     onChange.mock.calls.forEach(([, currentFilters]) => {
       const [, val] = Object.entries(currentFilters)[0];
       expect(val).toEqual(['Jack']);
     });
-    wrapper.update();
+
     expect(renderedNames(wrapper)).toEqual(['Jack']);
-    dropdownWrapper.find('MenuItem').last().simulate('click');
+
+    // What's this? Is that a coverage case?
+    getFilterMenu().find('li.ant-dropdown-menu-item').last().simulate('click');
+
     jest.useRealTimers();
   });
 
@@ -1508,6 +1544,7 @@ describe('Table.filter', () => {
 
     expect(wrapper.find('.ant-table-filter-column')).toHaveLength(3);
   });
+
   it('should pagination.current be 1 after filtering', () => {
     const onChange = jest.fn();
     const columns = [
@@ -1556,5 +1593,139 @@ describe('Table.filter', () => {
     wrapper.find('FilterDropdown').find('MenuItem').at(1).simulate('click');
     wrapper.find('.ant-btn-primary').first().simulate('click');
     expect(onChange.mock.calls[1][0].current).toBe(1);
+  });
+
+  // https://github.com/ant-design/ant-design/issues/30454
+  it('should not trigger onFilterDropdownVisibleChange when call confirm({ closeDropdown: false })', () => {
+    const onFilterDropdownVisibleChange = jest.fn();
+    const wrapper = mount(
+      createTable({
+        columns: [
+          {
+            title: 'Name',
+            dataIndex: 'name',
+            key: 'name',
+            filteredValue: name,
+            filterDropdown: ({ confirm }) => (
+              <>
+                <button id="confirm-and-close" type="button" onClick={() => confirm()}>
+                  confirm
+                </button>
+                <button
+                  id="confirm-only"
+                  type="button"
+                  onClick={() => confirm({ closeDropdown: false })}
+                >
+                  confirm
+                </button>
+              </>
+            ),
+            onFilterDropdownVisibleChange,
+          },
+        ],
+      }),
+    );
+
+    wrapper.find('.ant-dropdown-trigger').first().simulate('click');
+    expect(onFilterDropdownVisibleChange).toHaveBeenCalledTimes(1);
+
+    wrapper.find('#confirm-only').simulate('click');
+    expect(onFilterDropdownVisibleChange).toHaveBeenCalledTimes(1);
+
+    wrapper.find('#confirm-and-close').simulate('click');
+    expect(onFilterDropdownVisibleChange).toHaveBeenCalledTimes(2);
+    expect(onFilterDropdownVisibleChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it('Column with filter and children filters properly.', () => {
+    class App extends React.Component {
+      state = {
+        filteredInfo: null,
+        sortedInfo: null,
+      };
+
+      handleChange = (pagination, filters, sorter) => {
+        this.setState({
+          filteredInfo: filters,
+          sortedInfo: sorter,
+        });
+      };
+
+      render() {
+        let { sortedInfo, filteredInfo } = this.state;
+        sortedInfo = sortedInfo || {};
+        filteredInfo = filteredInfo || {};
+        const columns = [
+          {
+            title: 'Name',
+            dataIndex: 'name',
+            key: 'name',
+            filters: [
+              { text: 'Joe', value: 'Joe' },
+              { text: 'Jim', value: 'Jim' },
+            ],
+            filteredValue: filteredInfo.name || null,
+            onFilter: (value, record) => record.name.includes(value),
+            children: [
+              {
+                title: 'Age',
+                dataIndex: 'age',
+                key: 'age',
+              },
+            ],
+          },
+          {
+            title: 'Age',
+            dataIndex: 'age',
+            key: 'age',
+            sorter: (a, b) => a.age - b.age,
+            sortOrder: sortedInfo.columnKey === 'age' && sortedInfo.order,
+            ellipsis: true,
+          },
+        ];
+        return (
+          <>
+            <Table
+              columns={columns}
+              dataSource={[
+                {
+                  key: '1',
+                  name: 'John Brown',
+                  age: 32,
+                  address: 'New York No. 1 Lake Park',
+                },
+                {
+                  key: '2',
+                  name: 'Jim Green',
+                  age: 42,
+                  address: 'London No. 1 Lake Park',
+                },
+                {
+                  key: '3',
+                  name: 'Joe Black',
+                  age: 66,
+                  address: 'Sidney No. 1 Lake Park',
+                },
+                {
+                  key: '4',
+                  name: 'Jim Red',
+                  age: 32,
+                  address: 'London No. 2 Lake Park',
+                },
+              ]}
+              onChange={this.handleChange}
+            />
+          </>
+        );
+      }
+    }
+
+    const wrapper = mount(<App />);
+
+    expect(wrapper.find('.ant-table-tbody .ant-table-cell').first().text()).toEqual(`${32}`);
+    wrapper.find('.ant-dropdown-trigger.ant-table-filter-trigger').simulate('click');
+    wrapper.find('.ant-dropdown-menu-item').first().simulate('click');
+    wrapper.find('.ant-btn.ant-btn-primary.ant-btn-sm').simulate('click');
+    expect(wrapper.find('.ant-table-tbody .ant-table-cell').first().text()).toEqual(`${66}`);
   });
 });

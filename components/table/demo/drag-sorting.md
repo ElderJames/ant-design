@@ -20,39 +20,35 @@ import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import update from 'immutability-helper';
 
-const type = 'DragableBodyRow';
+const type = 'DraggableBodyRow';
 
-const DragableBodyRow = ({ index, moveRow, className, style, ...restProps }) => {
-  const ref = React.useRef();
-  const [{ isOver, dropClassName }, drop] = useDrop(
-    () => ({
-      accept: type,
-      collect: monitor => {
-        const { index: dragIndex } = monitor.getItem() || {};
-        if (dragIndex === index) {
-          return {};
-        }
-        return {
-          isOver: monitor.isOver(),
-          dropClassName: dragIndex < index ? ' drop-over-downward' : ' drop-over-upward',
-        };
-      },
-      drop: item => {
-        moveRow(item.index, index);
-      },
+const DraggableBodyRow = ({ index, moveRow, className, style, ...restProps }) => {
+  const ref = useRef();
+  const [{ isOver, dropClassName }, drop] = useDrop({
+    accept: type,
+    collect: monitor => {
+      const { index: dragIndex } = monitor.getItem() || {};
+      if (dragIndex === index) {
+        return {};
+      }
+      return {
+        isOver: monitor.isOver(),
+        dropClassName: dragIndex < index ? ' drop-over-downward' : ' drop-over-upward',
+      };
+    },
+    drop: item => {
+      moveRow(item.index, index);
+    },
+  });
+  const [, drag] = useDrag({
+    type,
+    item: { index },
+    collect: monitor => ({
+      isDragging: monitor.isDragging(),
     }),
-    [index],
-  );
-  const [, drag] = useDrag(
-    () => ({
-      item: { type, index },
-      collect: monitor => ({
-        isDragging: monitor.isDragging(),
-      }),
-    }),
-    [],
-  );
+  });
   drop(drag(ref));
+
   return (
     <tr
       ref={ref}
@@ -105,7 +101,7 @@ const DragSortingTable: React.FC = () => {
 
   const components = {
     body: {
-      row: DragableBodyRow,
+      row: DraggableBodyRow,
     },
   };
 
