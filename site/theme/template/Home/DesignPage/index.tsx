@@ -274,8 +274,10 @@ const DesignPage = (props: { location: any }) => {
                   <li>
                     <a href="https://antblazor.com/" target="_blank" rel="noopener noreferrer">
                       Ant Design of Blazor
-                      {IconComponent}
                     </a>
+                    <span style={smallStyle}>
+                      (<FormattedMessage id="app.implementation.community" />)
+                    </span>
                   </li>
                 </ul>
               </Col>
